@@ -1,0 +1,90 @@
+streamlit==1.31.0
+pandas==2.1.4
+reportlab==4.0.9
+```
+- Commit!
+
+### **4. Deploy to Streamlit Cloud**
+- Go to: https://share.streamlit.io/
+- Sign in with GitHub
+- Click "New app"
+- Select your repository
+- Main file: `nephrology_ai_app.py`
+- Click "Deploy!"
+
+### **5. Wait 2-3 Minutes... Done! 🎉**
+- Your app is live!
+- URL: `yourname-nephrology-ai.streamlit.app`
+- Share with your team!
+
+---
+
+## 🎯 **WHAT YOU'LL HAVE:**
+
+✅ **Professional web app** accessible anywhere  
+✅ **Free forever** (for public repos)  
+✅ **Auto-updates** when you push to GitHub  
+✅ **No servers** to manage or maintain  
+✅ **Mobile-friendly** - works on any device  
+✅ **Shareable URL** - just send the link  
+✅ **Analytics** to see who's using it  
+
+---
+
+## 📊 **YOUR APP WILL BE:**
+```
+https://nephrology-ai-assistant-xyz123.streamlit.app
+```
+
+**Features:**
+- ✅ Kt/V & URR calculations
+- ✅ Mineral metabolism assessment
+- ✅ Anemia management
+- ✅ Nutrition assessment
+- ✅ Professional PDF reports
+- ✅ SI Units throughout
+- ✅ KDOQI/KDIGO guidelines
+
+---
+
+## 🔐 **SECURITY NOTES:**
+
+### **Free Tier:**
+- ⚠️ **Public** - anyone with URL can access
+- ⚠️ **Not HIPAA compliant** (no BAA)
+- ✅ **Perfect for:** Demo, training, testing with dummy data
+- ❌ **Don't use:** Real patient data (PHI)
+
+### **For Real Patient Data:**
+- Deploy on internal hospital server
+- OR use HIPAA-compliant hosting (AWS/Azure with BAA)
+- OR upgrade to Streamlit Team plan + proper security
+
+---
+
+## 📧 **SAMPLE EMAIL TO SEND YOUR TEAM:**
+```
+Subject: New Tool - Nephrology AI Assistant 🏥
+
+Hi Team,
+
+Great news! I've deployed our new clinical assessment tool.
+
+🔗 **Access:** https://[your-url].streamlit.app
+
+**Features:**
+- Automated dialysis adequacy calculations
+- Clinical recommendations
+- PDF reports
+- Takes 2-3 minutes per patient (vs 15+ minutes manual)
+
+**Test with sample data:**
+- Pre-dialysis Urea: 24.3 mmol/L
+- Post-dialysis Urea: 7.9 mmol/L
+- [See app for full list]
+
+No installation needed - just bookmark the link!
+
+Try it out and let me know what you think.
+
+[Your Name]
