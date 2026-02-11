@@ -69,7 +69,7 @@ jobs:
         echo "SIZE_MB=$sizeMB" >> $env:GITHUB_OUTPUT
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: NephrologyAI-Windows-v${{ github.event.inputs.version }}
         path: NephrologyAI-Windows-v${{ github.event.inputs.version }}.zip
