@@ -1,0 +1,89 @@
+name: Build Windows EXE (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+      include_docs:
+        description: 'Include documentation files'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build executable
+      run: |
+        pyinstaller --clean `
+          --onedir `
+          --noconsole `
+          --name "NephrologyAI-v${{ github.event.inputs.version }}" `
+          --add-data "nephrology_ai_app.py;." `
+          --hidden-import streamlit `
+          --hidden-import pandas `
+          --hidden-import reportlab `
+          nephrology_launcher.py
+    
+    - name: Copy main app to dist
+      run: |
+        copy nephrology_ai_app.py "dist\NephrologyAI-v${{ github.event.inputs.version }}\"
+    
+    - name: Copy documentation (if requested)
+      if: ${{ github.event.inputs.include_docs == 'true' }}
+      run: |
+        if (Test-Path README.md) { copy README.md "dist\NephrologyAI-v${{ github.event.inputs.version }}\" }
+        if (Test-Path SETUP_GUIDE.md) { copy SETUP_GUIDE.md "dist\NephrologyAI-v${{ github.event.inputs.version }}\" }
+        if (Test-Path SI_UNITS_GUIDE.md) { copy SI_UNITS_GUIDE.md "dist\NephrologyAI-v${{ github.event.inputs.version }}\" }
+        if (Test-Path sample_patient_data.csv) { copy sample_patient_data.csv "dist\NephrologyAI-v${{ github.event.inputs.version }}\" }
+    
+    - name: Create ZIP archive
+      run: |
+        powershell Compress-Archive -Path "dist\NephrologyAI-v${{ github.event.inputs.version }}\*" -DestinationPath "NephrologyAI-Windows-v${{ github.event.inputs.version }}.zip"
+    
+    - name: Calculate file size
+      id: filesize
+      run: |
+        $size = (Get-Item "NephrologyAI-Windows-v${{ github.event.inputs.version }}.zip").length
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        echo "SIZE_MB=$sizeMB" >> $env:GITHUB_OUTPUT
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: NephrologyAI-Windows-v${{ github.event.inputs.version }}
+        path: NephrologyAI-Windows-v${{ github.event.inputs.version }}.zip
+        retention-days: 90
+    
+    - name: Create build summary
+      run: |
+        echo "## Build Successful! :rocket:" >> $env:GITHUB_STEP_SUMMARY
+        echo "" >> $env:GITHUB_STEP_SUMMARY
+        echo "**Version:** v${{ github.event.inputs.version }}" >> $env:GITHUB_STEP_SUMMARY
+        echo "**Size:** ${{ steps.filesize.outputs.SIZE_MB }} MB" >> $env:GITHUB_STEP_SUMMARY
+        echo "" >> $env:GITHUB_STEP_SUMMARY
+        echo "### Download Instructions:" >> $env:GITHUB_STEP_SUMMARY
+        echo "1. Go to Actions tab" >> $env:GITHUB_STEP_SUMMARY
+        echo "2. Click this workflow run" >> $env:GITHUB_STEP_SUMMARY
+        echo "3. Download artifact from Artifacts section" >> $env:GITHUB_STEP_SUMMARY
+        echo "4. Extract ZIP and run NephrologyAI-v${{ github.event.inputs.version }}.exe" >> $env:GITHUB_STEP_SUMMARY
