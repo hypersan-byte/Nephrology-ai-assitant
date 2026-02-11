@@ -33,6 +33,124 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
     
+    - name: Create launcher script
+      run: |
+        $launcherContent = @'
+        """
+        Nephrology AI Assistant - Windows Launcher
+        This script starts the Streamlit app and opens it in the default browser
+        """
+
+        import os
+        import sys
+        import subprocess
+        import webbrowser
+        import time
+        import socket
+        from pathlib import Path
+
+        def find_free_port():
+            """Find a free port to run Streamlit on"""
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', 0))
+                s.listen(1)
+                port = s.getsockname()[1]
+            return port
+
+        def get_app_path():
+            """Get the path to the main application"""
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                application_path = os.path.dirname(sys.executable)
+            else:
+                # Running as script
+                application_path = os.path.dirname(os.path.abspath(__file__))
+            return application_path
+
+        def main():
+            """Main launcher function"""
+            # Get paths
+            app_path = get_app_path()
+            app_file = os.path.join(app_path, "nephrology_ai_app.py")
+            
+            # Check if main app exists
+            if not os.path.exists(app_file):
+                print(f"ERROR: Could not find nephrology_ai_app.py in {app_path}")
+                input("Press Enter to exit...")
+                sys.exit(1)
+            
+            # Find free port
+            port = find_free_port()
+            
+            # Start Streamlit server
+            print(f"Starting Nephrology AI Assistant on port {port}...")
+            
+            # Prepare Streamlit command
+            streamlit_cmd = [
+                sys.executable,
+                "-m", "streamlit", "run",
+                app_file,
+                "--server.port", str(port),
+                "--server.headless", "true",
+                "--browser.gatherUsageStats", "false",
+                "--server.fileWatcherType", "none"
+            ]
+            
+            # Start Streamlit in background
+            try:
+                if sys.platform == "win32":
+                    # Windows: hide console window
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    process = subprocess.Popen(
+                        streamlit_cmd,
+                        startupinfo=startupinfo,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                else:
+                    process = subprocess.Popen(
+                        streamlit_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                
+                # Wait for server to start
+                print("Waiting for server to start...")
+                time.sleep(3)
+                
+                # Open browser
+                url = f"http://localhost:{port}"
+                print(f"Opening browser at {url}")
+                webbrowser.open(url)
+                
+                print("\nNephrology AI Assistant is now running!")
+                print(f"Access it at: {url}")
+                print("\nClose this window to stop the application.")
+                
+                # Keep running
+                try:
+                    process.wait()
+                except KeyboardInterrupt:
+                    print("\nShutting down...")
+                    process.terminate()
+                    process.wait()
+                    
+            except FileNotFoundError:
+                print("ERROR: Streamlit not found. Please ensure all dependencies are included.")
+                input("Press Enter to exit...")
+                sys.exit(1)
+            except Exception as e:
+                print(f"ERROR: {str(e)}")
+                input("Press Enter to exit...")
+                sys.exit(1)
+
+        if __name__ == "__main__":
+            main()
+        '@
+        
+        $launcherContent | Out-File -FilePath "nephrology_launcher.py" -Encoding utf8
+    
     - name: Build executable
       run: |
         pyinstaller --clean `
