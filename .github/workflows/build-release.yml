@@ -1,0 +1,92 @@
+name: Build Windows Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build executable
+      run: |
+        pyinstaller --clean `
+          --onedir `
+          --noconsole `
+          --name "NephrologyAI-${{ github.ref_name }}" `
+          --add-data "nephrology_ai_app.py;." `
+          --hidden-import streamlit `
+          --hidden-import pandas `
+          --hidden-import reportlab `
+          nephrology_launcher.py
+    
+    - name: Copy files to dist
+      run: |
+        copy nephrology_ai_app.py "dist\NephrologyAI-${{ github.ref_name }}\"
+        if (Test-Path README.md) { copy README.md "dist\NephrologyAI-${{ github.ref_name }}\" }
+        if (Test-Path SETUP_GUIDE.md) { copy SETUP_GUIDE.md "dist\NephrologyAI-${{ github.ref_name }}\" }
+        if (Test-Path SI_UNITS_GUIDE.md) { copy SI_UNITS_GUIDE.md "dist\NephrologyAI-${{ github.ref_name }}\" }
+        if (Test-Path sample_patient_data.csv) { copy sample_patient_data.csv "dist\NephrologyAI-${{ github.ref_name }}\" }
+    
+    - name: Create ZIP archive
+      run: |
+        powershell Compress-Archive -Path "dist\NephrologyAI-${{ github.ref_name }}\*" -DestinationPath "NephrologyAI-Windows-${{ github.ref_name }}.zip"
+    
+    - name: Get file size
+      id: filesize
+      run: |
+        $size = (Get-Item "NephrologyAI-Windows-${{ github.ref_name }}.zip").length
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        echo "SIZE_MB=$sizeMB" >> $env:GITHUB_OUTPUT
+    
+    - name: Calculate checksum
+      id: checksum
+      run: |
+        $hash = (Get-FileHash "NephrologyAI-Windows-${{ github.ref_name }}.zip" -Algorithm SHA256).Hash
+        echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
+    
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v1
+      with:
+        files: NephrologyAI-Windows-${{ github.ref_name }}.zip
+        body: |
+          ## Nephrology AI Assistant - Windows Package
+          
+          **Version:** ${{ github.ref_name }}
+          **Size:** ${{ steps.filesize.outputs.SIZE_MB }} MB
+          **SHA256:** ${{ steps.checksum.outputs.SHA256 }}
+          
+          ### Installation Instructions:
+          1. Download the ZIP file below
+          2. Extract to a folder
+          3. Run `NephrologyAI-${{ github.ref_name }}.exe`
+          4. Browser will open automatically
+          
+          ### What's Included:
+          - Windows executable
+          - All dependencies
+          - Documentation
+          - Sample data
+          
+          ### System Requirements:
+          - Windows 7 or later (10/11 recommended)
+          - 500 MB free disk space
+          - 4 GB RAM minimum
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
