@@ -1,0 +1,176 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+      create_dmg:
+        description: 'Create DMG installer'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Create launcher script
+      run: |
+        cat > nephrology_launcher_mac.py << 'EOF'
+        import os
+        import sys
+        import subprocess
+        import webbrowser
+        import time
+        import socket
+        
+        def find_free_port():
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', 0))
+                s.listen(1)
+                return s.getsockname()[1]
+        
+        def get_app_path():
+            if getattr(sys, 'frozen', False):
+                return os.path.dirname(sys.executable)
+            return os.path.dirname(os.path.abspath(__file__))
+        
+        def main():
+            app_path = get_app_path()
+            app_file = os.path.join(app_path, "nephrology_ai_app.py")
+            
+            if not os.path.exists(app_file):
+                print(f"ERROR: Could not find app file")
+                sys.exit(1)
+            
+            port = find_free_port()
+            
+            process = subprocess.Popen([
+                sys.executable, "-m", "streamlit", "run",
+                app_file,
+                "--server.port", str(port),
+                "--server.headless", "true",
+                "--browser.gatherUsageStats", "false"
+            ])
+            
+            time.sleep(3)
+            webbrowser.open(f"http://localhost:{port}")
+            
+            try:
+                process.wait()
+            except KeyboardInterrupt:
+                process.terminate()
+        
+        if __name__ == "__main__":
+            main()
+        EOF
+    
+    - name: Build application
+      run: |
+        pyinstaller --clean \
+          --name "Nephrology AI" \
+          --windowed \
+          --onedir \
+          --add-data "nephrology_ai_app.py:." \
+          --hidden-import streamlit \
+          --hidden-import pandas \
+          --hidden-import reportlab \
+          --hidden-import altair \
+          --hidden-import click \
+          --hidden-import toml \
+          --osx-bundle-identifier com.nephrologyai.app \
+          nephrology_launcher_mac.py
+        
+        cp nephrology_ai_app.py "dist/Nephrology AI.app/Contents/MacOS/"
+    
+    - name: Copy documentation
+      run: |
+        if [ -f README.md ]; then
+          cp README.md "dist/Nephrology AI.app/Contents/MacOS/"
+        fi
+        if [ -f SI_UNITS_GUIDE.md ]; then
+          cp SI_UNITS_GUIDE.md "dist/Nephrology AI.app/Contents/MacOS/"
+        fi
+    
+    - name: Create ZIP archive
+      run: |
+        cd dist
+        zip -r "../NephrologyAI-macOS-v${{ github.event.inputs.version }}.zip" "Nephrology AI.app"
+        cd ..
+    
+    - name: Calculate file size
+      id: filesize
+      run: |
+        SIZE_BYTES=$(stat -f%z "NephrologyAI-macOS-v${{ github.event.inputs.version }}.zip")
+        SIZE_MB=$(echo "scale=2; $SIZE_BYTES / 1024 / 1024" | bc)
+        echo "SIZE_MB=$SIZE_MB" >> $GITHUB_OUTPUT
+    
+    - name: Create DMG installer
+      if: ${{ github.event.inputs.create_dmg == 'true' }}
+      run: |
+        brew install create-dmg
+        
+        create-dmg \
+          --volname "Nephrology AI v${{ github.event.inputs.version }}" \
+          --window-pos 200 120 \
+          --window-size 600 400 \
+          --icon-size 100 \
+          --icon "Nephrology AI.app" 175 120 \
+          --hide-extension "Nephrology AI.app" \
+          --app-drop-link 425 120 \
+          "NephrologyAI-macOS-v${{ github.event.inputs.version }}.dmg" \
+          "dist/Nephrology AI.app" || true
+    
+    - name: Upload ZIP artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NephrologyAI-macOS-ZIP-v${{ github.event.inputs.version }}
+        path: NephrologyAI-macOS-v${{ github.event.inputs.version }}.zip
+        retention-days: 90
+    
+    - name: Upload DMG artifact
+      if: ${{ github.event.inputs.create_dmg == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: NephrologyAI-macOS-DMG-v${{ github.event.inputs.version }}
+        path: NephrologyAI-macOS-v${{ github.event.inputs.version }}.dmg
+        retention-days: 90
+    
+    - name: Create build summary
+      run: |
+        echo "## Build Successful! 🍎" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** v${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Size:** ${{ steps.filesize.outputs.SIZE_MB }} MB" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Download Instructions:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Go to Actions tab" >> $GITHUB_STEP_SUMMARY
+        echo "2. Click this workflow run" >> $GITHUB_STEP_SUMMARY
+        echo "3. Download ZIP or DMG from Artifacts section" >> $GITHUB_STEP_SUMMARY
+        echo "4. Extract/mount and drag to Applications folder" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Installation:" >> $GITHUB_STEP_SUMMARY
+        echo "- **ZIP:** Extract and drag to Applications" >> $GITHUB_STEP_SUMMARY
+        echo "- **DMG:** Open, drag to Applications folder" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### First Launch:" >> $GITHUB_STEP_SUMMARY
+        echo "Right-click app → Open (to bypass Gatekeeper)" >> $GITHUB_STEP_SUMMARY
